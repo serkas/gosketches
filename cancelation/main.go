@@ -9,39 +9,39 @@ import (
 	"time"
 )
 
-
-
+// Control
 type Ctl struct {
-	wg     *sync.WaitGroup
+	wg     sync.WaitGroup
 	stopCh chan struct{}
 }
 
 func main() {
-	fmt.Println("Start.")
-	var n sync.WaitGroup
-	var stopChannel = make(chan struct{})
+	nTasks := 3
+	fmt.Printf("Start %d tasks\n", nTasks)
 
-	ctl := Ctl{wg: &n, stopCh: stopChannel}
+	var stopChannel = make(chan struct{}) // Channel to notify all workers
+	ctl := &Ctl{stopCh: stopChannel}
 
-	for i := 1; i <= 3; i++ {
+	// Spawn workers
+	for i := 1; i <= nTasks; i++ {
 		ctl.wg.Add(1)
-		go work(fmt.Sprintf("Task %d", i), ctl)
+		taskName := fmt.Sprintf("Task %d", i)
+		go work(taskName, ctl)
 	}
 
-
+	// Stopping
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	for {
-		sig := <-signalChan
-		fmt.Printf("\n\nCaptured %v. Exiting...\n", sig)
-		close(stopChannel)
-		ctl.wg.Wait()
-		os.Exit(0)
-	}
+	sig := <-signalChan
+	fmt.Printf("\nCaptured %v. Exiting...\n", sig)
+	close(stopChannel) // notify workers
+
+	ctl.wg.Wait()
+	os.Exit(0)
 }
 
-func work(taskName string, ctl Ctl) {
+func work(taskName string, ctl *Ctl) {
 	defer ctl.wg.Done()
 	for {
 		select {
@@ -50,9 +50,8 @@ func work(taskName string, ctl Ctl) {
 			return
 		default:
 			fmt.Println(taskName + " -> I'm doing ... ")
-			time.Sleep(5 * time.Second)
+			time.Sleep(5 * time.Second) // Task logic to do
 			fmt.Println(taskName + " -> Done")
 		}
-
 	}
 }
